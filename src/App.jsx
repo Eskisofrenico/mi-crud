@@ -209,7 +209,12 @@ const TodoApp = () => {
             <div className="header-actions">
               {gamification.userLevel && (
                 <button 
-                  onClick={() => setShowAchievements(true)}
+                  onClick={() => {
+                    console.log('Botón de logros clickeado! Estado actual:', showAchievements);
+                    console.log('Datos de gamificación:', gamification);
+                    setShowAchievements(true);
+                    console.log('showAchievements establecido a true');
+                  }}
                   className="btn btn-outline-primary btn-sm"
                   title="Ver logros"
                 >
@@ -375,7 +380,12 @@ const TodoApp = () => {
             </span>
             <span className="footer-stat">
               <Zap size={14} style={{ display: 'inline', marginRight: '4px' }} />
-              {gamification.totalPoints || 0} puntos
+              {(() => {
+                // Debug: verificar los puntos del footer
+                console.log('Footer - Puntos totales:', gamification.totalPoints || 0);
+                console.log('Footer - Gamification completo:', gamification);
+                return gamification.totalPoints || 0;
+              })()} puntos
             </span>
             <span className="footer-stat">
               <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
@@ -390,10 +400,24 @@ const TodoApp = () => {
         <AchievementsDisplay
           isOpen={showAchievements}
           onClose={() => setShowAchievements(false)}
-          achievements={gamification.achievements}
-          achievementDefinitions={gamification.achievementDefinitions}
-          userLevel={gamification.userLevel}
-          stats={gamification.detailedStats}
+          stats={{
+            totalTasks: stats.totalTodos || 0,
+            totalCompleted: stats.completedTodos || 0,
+            todayCompleted: stats.todayCompleted || 0,
+            weekCompleted: stats.weekTodos || 0,
+            currentStreak: gamification.streaks?.current || 0,
+            longestStreak: gamification.streaks?.longest || 0,
+            earlyTasks: 0, // TODO: calcular tareas completadas temprano
+            lateTasks: 0,  // TODO: calcular tareas completadas tarde
+            weekendTasks: 0, // TODO: calcular tareas de fin de semana
+            activeDays: gamification.gamificationStats?.totalTasksCompleted || 0
+          }}
+          gamification={{
+            totalPoints: gamification.totalPoints || 0,
+            userLevel: gamification.userLevel || { level: 1, experience: 0, title: 'Novato Organizador' },
+            achievements: gamification.achievements || [],
+            levelInfo: gamification.levelInfo || { level: 1, experience: 0, nextLevelXP: 100, progress: 0 }
+          }}
         />
       )}
     </>

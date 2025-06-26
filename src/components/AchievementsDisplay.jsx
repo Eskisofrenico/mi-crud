@@ -1,29 +1,104 @@
-// components/AchievementsDisplay.jsx - Panel de logros con iconos profesionales
-import React, { useState, useEffect } from 'react';
-import {
-  Trophy,
-  Medal,
+// components/AchievementsDisplay.jsx - Sistema de logros completo
+import React, { useState, useMemo } from 'react';
+import { 
+  Trophy, 
+  Medal, 
+  Star, 
+  Target, 
+  Flame, 
+  Zap, 
+  CheckCircle, 
+  X, 
   Award,
-  Star,
-  Zap,
-  Target,
-  Clock,
-  CheckCircle,
-  TrendingUp,
-  Calendar,
-  Flame,
   Crown,
-  Diamond,
-  Sparkles,
-  X,
-  ChevronRight,
-  BarChart3,
-  Users,
-  Brain,
-  Coffee,
-  Rocket,
-  Shield
+  Calendar,
+  TrendingUp,
+  Lock
 } from 'lucide-react';
+
+// Definiciones de logros (inspirado en taskr)
+const ACHIEVEMENT_DEFINITIONS = [
+  {
+    id: 'first-task',
+    title: 'Primer Paso',
+    description: 'Completa tu primera tarea',
+    icon: Target,
+    category: 'milestones',
+    iconColor: '#10b981',
+    points: 10,
+    condition: (stats) => stats.totalCompleted >= 1
+  },
+  {
+    id: 'task-5',
+    title: 'En Marcha',
+    description: 'Completa 5 tareas',
+    icon: Zap,
+    category: 'productivity',
+    iconColor: '#3b82f6',
+    points: 25,
+    condition: (stats) => stats.totalCompleted >= 5
+  },
+  {
+    id: 'task-10',
+    title: 'Productivo',
+    description: 'Completa 10 tareas',
+    icon: CheckCircle,
+    category: 'productivity',
+    iconColor: '#f59e0b',
+    points: 50,
+    condition: (stats) => stats.totalCompleted >= 10
+  },
+  {
+    id: 'task-25',
+    title: 'Imparable',
+    description: 'Completa 25 tareas',
+    icon: Award,
+    category: 'milestones',
+    iconColor: '#8b5cf6',
+    points: 100,
+    condition: (stats) => stats.totalCompleted >= 25
+  },
+  {
+    id: 'task-50',
+    title: 'Maestro de Tareas',
+    description: 'Completa 50 tareas',
+    icon: Crown,
+    category: 'milestones',
+    iconColor: '#f59e0b',
+    points: 200,
+    condition: (stats) => stats.totalCompleted >= 50
+  },
+  {
+    id: 'streak-3',
+    title: 'Constante',
+    description: 'Mantén una racha de 3 días',
+    icon: Flame,
+    category: 'consistency',
+    iconColor: '#ef4444',
+    points: 75,
+    condition: (stats) => stats.currentStreak >= 3
+  },
+  {
+    id: 'streak-7',
+    title: 'Disciplinado',
+    description: 'Mantén una racha de 7 días',
+    icon: Calendar,
+    category: 'consistency',
+    iconColor: '#f97316',
+    points: 150,
+    condition: (stats) => stats.currentStreak >= 7
+  },
+  {
+    id: 'perfectionist',
+    title: 'Perfeccionista',
+    description: 'Alcanza 100% de progreso',
+    icon: Star,
+    category: 'special',
+    iconColor: '#eab308',
+    points: 300,
+    condition: (stats) => stats.totalTasks > 0 && stats.totalCompleted === stats.totalTasks
+  }
+];
 
 const AchievementsDisplay = ({ 
   isOpen, 
@@ -31,115 +106,68 @@ const AchievementsDisplay = ({
   achievements = [], 
   achievementDefinitions = [],
   userLevel = {}, 
-  stats = {} 
+  stats = {},
+  gamification = {}
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [animating, setAnimating] = useState(false);
 
-  // Activar animación al abrir
-  useEffect(() => {
-    if (isOpen) {
-      setAnimating(true);
-      const timer = setTimeout(() => setAnimating(false), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  // Calcular logros desbloqueados basado en estadísticas actuales
+  const unlockedAchievements = useMemo(() => {
+    return ACHIEVEMENT_DEFINITIONS.filter(achievement => 
+      achievement.condition(stats)
+    ).map(achievement => ({
+      ...achievement,
+      unlocked: true,
+      unlockedAt: new Date().toISOString() // En un caso real, esto vendría de la base de datos
+    }));
+  }, [stats]);
 
-  // Obtener icono de logro desde las definiciones
-  const getAchievementIcon = (achievementId) => {
-    const definition = achievementDefinitions.find(def => def.id === achievementId);
-    if (!definition || !definition.icon) {
-      return <Star size={24} />;
-    }
+  // Calcular progreso del usuario usando datos de gamification
+  const userProgress = useMemo(() => {
+    // Usar EXACTAMENTE los mismos puntos que el dashboard
+    const totalPoints = gamification.totalPoints || 0;
+    const currentLevel = gamification.userLevel?.level || 1;
+    const currentExperience = gamification.userLevel?.experience || 0;
+    const levelInfo = gamification.levelInfo || { nextLevelXP: 100, progress: 0 };
     
-    const IconComponent = definition.icon;
-    return <IconComponent size={24} style={{ color: definition.iconColor || '#6b7280' }} />;
-  };
+    // Debug: verificar que los puntos coincidan
+    console.log('Modal - Puntos totales:', totalPoints);
+    console.log('Modal - Gamification completo:', gamification);
+    
+    return {
+      level: currentLevel,
+      totalPoints, // Estos deben ser exactamente los mismos que en el footer
+      currentLevelPoints: currentExperience,
+      nextLevelPoints: levelInfo.nextLevelXP || 100,
+      progress: levelInfo.progress || 0
+    };
+  }, [gamification]);
 
-  // Calcular progreso al siguiente nivel
-  const getNextLevelProgress = () => {
-    if (!userLevel.currentXP || !userLevel.nextLevelXP) return 0;
-    return Math.min((userLevel.currentXP / userLevel.nextLevelXP) * 100, 100);
-  };
+  // Categorizar logros
+  const categorizedAchievements = useMemo(() => {
+    const categories = {
+      milestones: { name: 'Hitos', icon: Trophy, achievements: [] },
+      productivity: { name: 'Productividad', icon: Zap, achievements: [] },
+      consistency: { name: 'Consistencia', icon: Flame, achievements: [] },
+      special: { name: 'Especiales', icon: Crown, achievements: [] }
+    };
 
-  // Obtener icono de nivel
-  const getLevelIcon = (level) => {
-    if (level >= 50) return <Crown className="text-yellow-500" size={32} />;
-    if (level >= 30) return <Diamond className="text-purple-500" size={32} />;
-    if (level >= 20) return <Award className="text-blue-500" size={32} />;
-    if (level >= 10) return <Medal className="text-green-500" size={32} />;
-    return <Trophy className="text-orange-500" size={32} />;
-  };
-
-  // Logros recientes (últimos 5)
-  const recentAchievements = achievements
-    .filter(achievement => achievement.unlockedAt)
-    .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
-    .slice(0, 5);
-
-  // Categorías de logros
-  const achievementCategories = [
-    {
-      id: 'productivity',
-      name: 'Productividad',
-      icon: <Target size={20} />,
-      achievements: achievements.filter(a => {
-        const def = achievementDefinitions.find(d => d.id === a.id);
-        return def?.category === 'productivity';
-      })
-    },
-    {
-      id: 'consistency',
-      name: 'Consistencia',
-      icon: <Calendar size={20} />,
-      achievements: achievements.filter(a => {
-        const def = achievementDefinitions.find(d => d.id === a.id);
-        return def?.category === 'consistency';
-      })
-    },
-    {
-      id: 'milestones',
-      name: 'Hitos',
-      icon: <Trophy size={20} />,
-      achievements: achievements.filter(a => {
-        const def = achievementDefinitions.find(d => d.id === a.id);
-        return def?.category === 'milestones';
-      })
-    },
-    {
-      id: 'special',
-      name: 'Especiales',
-      icon: <Sparkles size={20} />,
-      achievements: achievements.filter(a => {
-        const def = achievementDefinitions.find(d => d.id === a.id);
-        return def?.category === 'special';
-      })
-    },
-    {
-      id: 'focus',
-      name: 'Enfoque',
-      icon: <Brain size={20} />,
-      achievements: achievements.filter(a => {
-        const def = achievementDefinitions.find(d => d.id === a.id);
-        return def?.category === 'focus';
-      })
-    }
-  ];
-
-  // Formatear fecha
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+    ACHIEVEMENT_DEFINITIONS.forEach(achievement => {
+      const isUnlocked = unlockedAchievements.some(ua => ua.id === achievement.id);
+      categories[achievement.category].achievements.push({
+        ...achievement,
+        unlocked: isUnlocked
+      });
     });
-  };
+
+    return categories;
+  }, [unlockedAchievements]);
 
   if (!isOpen) return null;
 
   return (
     <div className="achievements-backdrop">
-      <div className={`achievements-modal ${animating ? 'modal-animating' : ''}`}>
+      <div className="achievements-modal">
         {/* Header */}
         <div className="achievements-header">
           <div className="header-content">
@@ -149,16 +177,16 @@ const AchievementsDisplay = ({
             </h2>
             <div className="header-stats">
               <div className="stat-item">
-                <Award size={16} />
-                {achievements.filter(a => a.unlocked).length} Logros
+                <Trophy size={16} />
+                {unlockedAchievements.length} / {ACHIEVEMENT_DEFINITIONS.length} Logros
               </div>
               <div className="stat-item">
-                <Zap size={16} />
-                {userLevel.currentXP || 0} XP
+                <Medal size={16} />
+                {userProgress.totalPoints} Puntos
               </div>
               <div className="stat-item">
-                <Star size={16} />
-                Nivel {userLevel.level || 1}
+                <Crown size={16} />
+                Nivel {userProgress.level}
               </div>
             </div>
           </div>
@@ -167,105 +195,97 @@ const AchievementsDisplay = ({
           </button>
         </div>
 
-        {/* Tabs de navegación */}
+        {/* Tabs */}
         <div className="achievements-tabs">
           <button
             onClick={() => setActiveTab('overview')}
             className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
           >
-            <BarChart3 className="tab-icon" size={18} />
-            <span className="tab-label">Resumen</span>
+            <TrendingUp size={18} />
+            <span>Resumen</span>
           </button>
           <button
             onClick={() => setActiveTab('achievements')}
             className={`tab-btn ${activeTab === 'achievements' ? 'active' : ''}`}
           >
-            <Trophy className="tab-icon" size={18} />
-            <span className="tab-label">Logros</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('progress')}
-            className={`tab-btn ${activeTab === 'progress' ? 'active' : ''}`}
-          >
-            <TrendingUp className="tab-icon" size={18} />
-            <span className="tab-label">Progreso</span>
+            <Trophy size={18} />
+            <span>Logros</span>
           </button>
         </div>
 
-        {/* Contenido de tabs */}
+        {/* Content */}
         <div className="achievements-content">
-          {/* Tab: Resumen */}
           {activeTab === 'overview' && (
             <div className="tab-panel">
-              {/* Información del nivel actual */}
+              {/* Progress Overview */}
               <div className="level-overview">
                 <div className="level-display">
                   <div className="level-icon">
-                    {getLevelIcon(userLevel.level || 1)}
+                    <Crown size={32} style={{ color: '#f59e0b' }} />
                   </div>
                   <div className="level-info">
-                    <h3 className="level-title">
-                      Nivel {userLevel.level || 1}
-                    </h3>
-                    <p className="level-subtitle">
-                      {userLevel.title || 'Novato Organizador'}
-                    </p>
+                    <h3>Nivel {userProgress.level}</h3>
+                    <p>Organizador {userProgress.level > 5 ? 'Avanzado' : 'Novato'}</p>
                     <div className="level-progress">
                       <div className="progress-bar">
                         <div 
                           className="progress-fill"
-                          style={{ width: `${getNextLevelProgress()}%` }}
+                          style={{ width: `${userProgress.progress}%` }}
                         />
                       </div>
                       <span className="progress-text">
-                        {userLevel.currentXP || 0} / {userLevel.nextLevelXP || 100} XP
+                        {userProgress.currentLevelPoints} / {userProgress.nextLevelPoints} puntos
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Logros recientes */}
+              {/* Recent Achievements */}
               <div className="recent-achievements">
                 <h4>
-                  <CheckCircle size={20} />
+                  <Medal size={20} />
                   Logros Recientes
                 </h4>
-                {recentAchievements.length > 0 ? (
+                {unlockedAchievements.length > 0 ? (
                   <div className="achievements-list">
-                    {recentAchievements.map(achievement => (
-                      <div key={achievement.id} className="achievement-item recent">
-                        <div className="achievement-icon">
-                          {getAchievementIcon(achievement.id)}
-                        </div>
-                        <div className="achievement-content">
-                          <h5 className="achievement-title">{achievement.title}</h5>
-                          <p className="achievement-description">{achievement.description}</p>
-                          <div className="achievement-meta">
-                            <span className="achievement-points">+{achievement.points} XP</span>
-                            <span className="achievement-date">{formatDate(achievement.unlockedAt)}</span>
+                    {unlockedAchievements.slice(-3).reverse().map(achievement => {
+                      const IconComponent = achievement.icon;
+                      return (
+                        <div key={achievement.id} className="achievement-item recent">
+                          <div className="achievement-icon">
+                            <IconComponent size={24} style={{ color: achievement.iconColor }} />
+                          </div>
+                          <div className="achievement-content">
+                            <h5>{achievement.title}</h5>
+                            <p>{achievement.description}</p>                          <div className="achievement-meta">
+                            <span className="achievement-points">
+                              <Zap size={12} />
+                              +{achievement.points} pts
+                            </span>
+                          </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="empty-state">
-                    <Trophy size={48} className="empty-icon" />
-                    <p>¡Empieza a completar tareas para desbloquear logros!</p>
+                    <Trophy size={48} />
+                    <p>¡Completa tareas para desbloquear logros!</p>
                   </div>
                 )}
               </div>
 
-              {/* Próximos objetivos */}
+              {/* Next Achievements */}
               <div className="next-achievements">
                 <h4>
                   <Target size={20} />
                   Próximos Objetivos
                 </h4>
                 <div className="next-goals">
-                  {achievementDefinitions
-                    .filter(def => !achievements.find(a => a.id === def.id))
+                  {ACHIEVEMENT_DEFINITIONS
+                    .filter(def => !unlockedAchievements.some(ua => ua.id === def.id))
                     .slice(0, 3)
                     .map(goal => {
                       const IconComponent = goal.icon;
@@ -273,14 +293,14 @@ const AchievementsDisplay = ({
                         <div key={goal.id} className="goal-card">
                           <div className="goal-header">
                             <div className="goal-icon">
-                              <IconComponent size={20} style={{ color: goal.iconColor }} />
+                              <IconComponent size={20} style={{ color: '#9ca3af' }} />
                             </div>
-                            <h5 className="goal-title">{goal.title}</h5>
+                            <h5>{goal.title}</h5>
                           </div>
-                          <p className="goal-description">{goal.description}</p>
+                          <p>{goal.description}</p>
                           <div className="goal-reward">
-                            <Zap size={14} />
-                            {goal.points} XP
+                            <Medal size={14} />
+                            {goal.points} pts
                           </div>
                         </div>
                       );
@@ -290,173 +310,57 @@ const AchievementsDisplay = ({
             </div>
           )}
 
-          {/* Tab: Logros */}
           {activeTab === 'achievements' && (
             <div className="tab-panel">
-              <div className="achievements-overview">
-                <div className="achievements-stats">
-                  <div className="stat-card">
-                    <Trophy size={24} />
-                    <div className="stat-info">
-                      <span className="stat-number">{achievements.filter(a => a.unlocked).length}</span>
-                      <span className="stat-label">Desbloqueados</span>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <Target size={24} />
-                    <div className="stat-info">
-                      <span className="stat-number">{achievementDefinitions.length}</span>
-                      <span className="stat-label">Total</span>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <Zap size={24} />
-                    <div className="stat-info">
-                      <span className="stat-number">
-                        {achievements.reduce((total, a) => total + (a.points || 0), 0)}
-                      </span>
-                      <span className="stat-label">XP Total</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logros por categoría */}
-              {achievementCategories.map(category => (
-                <div key={category.id} className="achievement-category">
+              {/* Categories */}
+              {Object.entries(categorizedAchievements).map(([categoryId, category]) => (
+                <div key={categoryId} className="achievement-category">
                   <h4 className="category-title">
-                    {category.icon}
+                    <category.icon size={20} />
                     {category.name}
                     <span className="category-count">
-                      ({category.achievements.length}/{achievementDefinitions.filter(def => def.category === category.id).length})
+                      ({category.achievements.filter(a => a.unlocked).length}/{category.achievements.length})
                     </span>
                   </h4>
                   <div className="achievements-grid">
-                    {achievementDefinitions
-                      .filter(def => def.category === category.id)
-                      .map(achievement => {
-                        const unlocked = achievements.find(a => a.id === achievement.id);
-                        const IconComponent = achievement.icon;
-                        
-                        return (
-                          <div
-                            key={achievement.id}
-                            className={`achievement-card ${unlocked ? 'unlocked' : 'locked'}`}
-                          >
-                            <div className="achievement-icon">
-                              <IconComponent 
-                                size={24} 
-                                style={{ 
-                                  color: unlocked ? achievement.iconColor : '#9ca3af',
-                                  opacity: unlocked ? 1 : 0.5
-                                }} 
-                              />
-                            </div>
-                            <div className="achievement-content">
-                              <h5 className="achievement-title">{achievement.title}</h5>
-                              <p className="achievement-description">{achievement.description}</p>
-                              <div className="achievement-meta">
-                                <span className="achievement-points">+{achievement.points} XP</span>
-                                {unlocked && unlocked.unlockedAt && (
-                                  <span className="achievement-date">{formatDate(unlocked.unlockedAt)}</span>
-                                )}
-                              </div>
+                    {category.achievements.map(achievement => {
+                      const IconComponent = achievement.icon;
+                      return (
+                        <div
+                          key={achievement.id}
+                          className={`achievement-card ${achievement.unlocked ? 'unlocked' : 'locked'}`}
+                        >
+                          <div className="achievement-icon">
+                            <IconComponent 
+                              size={24} 
+                              style={{ 
+                                color: achievement.unlocked ? achievement.iconColor : '#9ca3af',
+                                opacity: achievement.unlocked ? 1 : 0.5
+                              }} 
+                            />
+                          </div>
+                          <div className="achievement-content">
+                            <h5>{achievement.title}</h5>
+                            <p>{achievement.description}</p>
+                            <div className="achievement-meta">
+                              <span className="achievement-points">
+                                <Zap size={12} />
+                                +{achievement.points} pts
+                              </span>
+                              {!achievement.unlocked && (
+                                <div className="locked-indicator">
+                                  <Lock size={12} />
+                                  Bloqueado
+                                </div>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Tab: Progreso */}
-          {activeTab === 'progress' && (
-            <div className="tab-panel">
-              <div className="progress-overview">
-                <h3>
-                  <TrendingUp size={24} />
-                  Tu Progreso
-                </h3>
-                
-                <div className="stats-sections">
-                  <div className="stats-section">
-                    <h4 className="section-title">
-                      <BarChart3 size={20} />
-                      Estadísticas Generales
-                    </h4>
-                    <div className="stats-list">
-                      <div className="stat-row">
-                        <span className="stat-label">Total de tareas:</span>
-                        <span className="stat-value">{stats.totalTasks || 0}</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Completadas:</span>
-                        <span className="stat-value">{stats.totalCompleted || 0}</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Tasa de éxito:</span>
-                        <span className="stat-value">
-                          {stats.totalTasks ? Math.round((stats.totalCompleted / stats.totalTasks) * 100) : 0}%
-                        </span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Experiencia total:</span>
-                        <span className="stat-value">{userLevel.experience || 0} XP</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="stats-section">
-                    <h4 className="section-title">
-                      <Flame size={20} />
-                      Rachas y Consistencia
-                    </h4>
-                    <div className="stats-list">
-                      <div className="stat-row">
-                        <span className="stat-label">Racha actual:</span>
-                        <span className="stat-value">{stats.currentStreak || 0} días</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Racha más larga:</span>
-                        <span className="stat-value">{stats.longestStreak || 0} días</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Días activos:</span>
-                        <span className="stat-value">{stats.activeDays || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="stats-section">
-                    <h4 className="section-title">
-                      <Award size={20} />
-                      Logros y Puntos
-                    </h4>
-                    <div className="stats-list">
-                      <div className="stat-row">
-                        <span className="stat-label">Logros desbloqueados:</span>
-                        <span className="stat-value">
-                          {achievements.filter(a => a.unlocked).length}/{achievementDefinitions.length}
-                        </span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Puntos de logros:</span>
-                        <span className="stat-value">
-                          {achievements.reduce((total, a) => total + (a.points || 0), 0)} XP
-                        </span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Progreso general:</span>
-                        <span className="stat-value">
-                          {Math.round((achievements.filter(a => a.unlocked).length / achievementDefinitions.length) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>

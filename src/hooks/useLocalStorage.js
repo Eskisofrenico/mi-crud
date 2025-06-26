@@ -1,4 +1,8 @@
-// hooks/useLocalStorage.js - Hook optimizado para localStorage
+// ===================================================
+// SOLUCIÓN RÁPIDA: Reemplaza useLocalStorage.js
+// ===================================================
+
+// hooks/useLocalStorage.js - Hook optimizado SIN bucle infinito
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 export const useLocalStorage = (key, initialValue, options = {}) => {
@@ -9,6 +13,7 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
     errorHandler = console.error
   } = options;
 
+  // ✅ CORRECCIÓN: Solo inicializar una vez
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
@@ -28,7 +33,6 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
       if (validateData(parsed, initialValue)) {
         return parsed;
       } else {
-        // Datos corruptos, usar valor inicial
         console.warn(`Datos corruptos en localStorage para la clave: ${key}`);
         return initialValue;
       }
@@ -38,13 +42,18 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
     }
   });
 
-  const isInitialMount = useRef(true);
+  // ✅ CORRECCIÓN: Usar ref para evitar dependencias circulares
+  const setValueRef = useRef();
 
-  // Función para establecer valor
+  // ✅ CORRECCIÓN: setValue que no cause bucles
   const setValue = useCallback((value) => {
     try {
-      // Permitir función de callback como setState
       const valueToStore = value instanceof Function ? value(storedValue) : value;
+      
+      // ✅ Solo actualizar si el valor realmente cambió
+      if (JSON.stringify(valueToStore) === JSON.stringify(storedValue)) {
+        return;
+      }
       
       setStoredValue(valueToStore);
 
@@ -70,6 +79,9 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
     }
   }, [key, storedValue, serializer, compression, syncAcrossTabs, errorHandler]);
 
+  // Guardar referencia
+  setValueRef.current = setValue;
+
   // Función para eliminar valor
   const removeValue = useCallback(() => {
     try {
@@ -80,7 +92,7 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
     }
   }, [key, initialValue, errorHandler]);
 
-  // Sincronización entre pestañas
+  // ✅ CORRECCIÓN: Sincronización sin bucles
   useEffect(() => {
     if (!syncAcrossTabs) return;
 
@@ -93,7 +105,10 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
             parsed = decompressData(parsed.data);
           }
 
-          setStoredValue(parsed);
+          // ✅ Solo actualizar si es diferente
+          if (JSON.stringify(parsed) !== JSON.stringify(storedValue)) {
+            setStoredValue(parsed);
+          }
         } catch (error) {
           errorHandler(error);
         }
@@ -101,7 +116,10 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
     };
 
     const handleCustomEvent = (e) => {
-      setStoredValue(e.detail);
+      // ✅ Solo actualizar si es diferente
+      if (JSON.stringify(e.detail) !== JSON.stringify(storedValue)) {
+        setStoredValue(e.detail);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -111,24 +129,22 @@ export const useLocalStorage = (key, initialValue, options = {}) => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener(`localStorage-${key}`, handleCustomEvent);
     };
-  }, [key, serializer, compression, syncAcrossTabs, errorHandler]);
+  }, [key, serializer, compression, syncAcrossTabs, errorHandler]); // ✅ REMOVIDO storedValue de las dependencias
 
-  // Evitar guardar en el primer render
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    setValue(storedValue);
-  }, [storedValue]);
+  // ✅ ELIMINADO: Este useEffect que causaba el bucle
+  // useEffect(() => {
+  //   if (isInitialMount.current) {
+  //     isInitialMount.current = false;
+  //     return;
+  //   }
+  //   setValue(storedValue); // ❌ ESTO CAUSABA EL BUCLE
+  // }, [storedValue]);
 
   return [storedValue, setValue, removeValue];
 };
 
-// Funciones auxiliares
+// Funciones auxiliares (sin cambios)
 const validateData = (data, template) => {
-  // Validación básica de estructura
   if (Array.isArray(template)) {
     return Array.isArray(data);
   }
@@ -141,35 +157,30 @@ const validateData = (data, template) => {
 };
 
 const shouldCompress = (data) => {
-  // Comprimir si los datos son grandes (>5KB)
   const size = new Blob([JSON.stringify(data)]).size;
   return size > 5120; // 5KB
 };
 
 const compressData = (data) => {
-  // Compresión simple usando LZ-string si está disponible
-  // En un proyecto real, podrías usar una librería como lz-string
   return JSON.stringify(data);
 };
 
 const decompressData = (compressedData) => {
-  // Descompresión correspondiente
   return JSON.parse(compressedData);
 };
 
-// Hook especializado para todos
+// Hook especializado para todos (sin cambios)
 export const useTodosStorage = () => {
   return useLocalStorage('todos', [], {
     syncAcrossTabs: true,
     compression: true,
     errorHandler: (error) => {
       console.error('Error en almacenamiento de todos:', error);
-      // Aquí podrías enviar el error a un servicio de logging
     }
   });
 };
 
-// Hook para configuraciones de la app
+// Hook para configuraciones de la app (sin cambios)
 export const useAppSettings = () => {
   const defaultSettings = {
     theme: 'light',
@@ -184,3 +195,4 @@ export const useAppSettings = () => {
     syncAcrossTabs: true
   });
 };
+

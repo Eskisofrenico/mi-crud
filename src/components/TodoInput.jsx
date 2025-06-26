@@ -55,6 +55,25 @@ const TodoInput = forwardRef(({
   const internalRef = useRef(null);
   const inputRef = ref || internalRef;
 
+  // ================================
+  // FUNCIONES DE FECHA CORREGIDAS
+  // ================================
+  
+  // Función para obtener fecha local en formato YYYY-MM-DD
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Función para obtener fecha + días
+  const getDatePlusDays = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return getLocalDateString(date);
+  };
+
   // Categorías base (ahora extensibles)
   const [categories, setCategories] = useState({
     trabajo: {
@@ -259,16 +278,21 @@ const TodoInput = forwardRef(({
   const currentCategory = detectCategory(value);
   const currentPriority = detectPriority(value);
 
-  // Formatear fecha para mostrar
+  // Formatear fecha para mostrar - CORREGIDO
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T00:00:00'); // Evitar problemas de zona horaria
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Hoy';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Mañana';
+    // Comparar solo las fechas, no las horas
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const tomorrowOnly = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
+
+    if (dateOnly.getTime() === todayOnly.getTime()) return 'Hoy';
+    if (dateOnly.getTime() === tomorrowOnly.getTime()) return 'Mañana';
     
     return date.toLocaleDateString('es-ES', { 
       day: 'numeric', 
@@ -284,9 +308,20 @@ const TodoInput = forwardRef(({
     value.trim() && 'has-value'
   ].filter(Boolean).join(' ');
 
+  const wrapperClasses = [
+    'todo-input-wrapper-enhanced',
+    value.trim() && 'has-content',
+    value.length > 0 && 'typing',
+    currentCategory && 'has-category',
+    currentPriority === 'high' && 'has-priority',
+    isNearLimit && 'near-limit',
+    isOverLimit && 'over-limit',
+    (currentCategory || currentPriority === 'high') && 'has-indicators'
+  ].filter(Boolean).join(' ');
+
   return (
     <div className="todo-input-container-enhanced">
-      <div className="todo-input-wrapper-enhanced">
+      <div className={wrapperClasses}>
         {/* Input principal */}
         <div className="input-field-container">
           <textarea
@@ -314,56 +349,31 @@ const TodoInput = forwardRef(({
             {/* Agregar fecha límite */}
             <button
               type="button"
-              className={`action-btn ${selectedDate ? 'active' : ''}`}
+              className={`action-btn date-btn ${selectedDate ? 'active' : ''}`}
               onClick={() => setShowDatePicker(!showDatePicker)}
-              title="Agregar fecha límite"
+              title={selectedDate ? `Fecha límite: ${formatDateForDisplay(selectedDate)}` : "Agregar fecha límite"}
             >
-              <Calendar size={16} />
-              {selectedDate && <span className="action-badge">{formatDateForDisplay(selectedDate)}</span>}
+              <Calendar size={24} />
+              {selectedDate && (
+                <span className="action-badge">
+                  {formatDateForDisplay(selectedDate)}
+                </span>
+              )}
             </button>
 
             {/* Gestionar categorías */}
             <button
               type="button"
-              className="action-btn"
+              className="action-btn category-btn"
               onClick={() => setShowCategoryManager(!showCategoryManager)}
               title="Gestionar categorías"
             >
-              <Settings size={16} />
+              <Settings size={24} />
             </button>
           </div>
         </div>
 
-        {/* Indicadores debajo del input */}
-        <div className="input-indicators-enhanced">
-          {/* Indicador de categoría */}
-          {currentCategory && (
-            <div 
-              className="category-indicator-enhanced"
-              style={{ backgroundColor: currentCategory.color + '15', borderColor: currentCategory.color }}
-            >
-              <span className="category-icon">{currentCategory.icon}</span>
-              <span className="category-text">Detectado como: <strong>{currentCategory.name}</strong></span>
-            </div>
-          )}
-
-          {/* Indicador de prioridad */}
-          {currentPriority === 'high' && (
-            <div className="priority-indicator-enhanced">
-              <AlertCircle size={16} />
-              <span>Prioridad alta</span>
-            </div>
-          )}
-
-          {/* Contador de caracteres */}
-          {showCharacterCount && (
-            <div className={`character-counter-enhanced ${isNearLimit ? 'near-limit' : ''} ${isOverLimit ? 'over-limit' : ''}`}>
-              {value.length}/{maxLength}
-            </div>
-          )}
-        </div>
-
-        {/* Selector de fecha límite */}
+        {/* Selector de fecha límite - CORREGIDO */}
         {showDatePicker && (
           <div className="date-picker-container">
             <div className="date-picker-header">
@@ -378,25 +388,17 @@ const TodoInput = forwardRef(({
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={getLocalDateString()} // CORREGIDO: usar función local
                 className="date-input"
               />
               <div className="date-quick-actions">
-                <button onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+                <button onClick={() => setSelectedDate(getLocalDateString())}>
                   Hoy
                 </button>
-                <button onClick={() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  setSelectedDate(tomorrow.toISOString().split('T')[0]);
-                }}>
+                <button onClick={() => setSelectedDate(getDatePlusDays(1))}>
                   Mañana
                 </button>
-                <button onClick={() => {
-                  const nextWeek = new Date();
-                  nextWeek.setDate(nextWeek.getDate() + 7);
-                  setSelectedDate(nextWeek.toISOString().split('T')[0]);
-                }}>
+                <button onClick={() => setSelectedDate(getDatePlusDays(7))}>
                   Próxima semana
                 </button>
               </div>
@@ -441,6 +443,7 @@ const TodoInput = forwardRef(({
                     className="add-word-btn"
                   >
                     <Plus size={14} />
+                    Agregar
                   </button>
                 </div>
               </div>
@@ -466,6 +469,37 @@ const TodoInput = forwardRef(({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Indicadores debajo del input */}
+        <div className={`input-indicators-enhanced ${(currentCategory || currentPriority === 'high') ? 'has-indicators' : ''}`}>
+          {/* Indicador de categoría */}
+          {currentCategory && (
+            <div 
+              className="category-indicator-enhanced"
+              style={{ backgroundColor: currentCategory.color + '15', borderColor: currentCategory.color }}
+            >
+              <span className="category-icon" style={{ backgroundColor: currentCategory.color, color: 'white' }}>
+                {currentCategory.icon}
+              </span>
+              <span className="category-text">Detectado como: <strong>{currentCategory.name}</strong></span>
+            </div>
+          )}
+
+          {/* Indicador de prioridad */}
+          {currentPriority === 'high' && (
+            <div className="priority-indicator-enhanced">
+              <AlertCircle size={16} />
+              <span>Prioridad alta</span>
+            </div>
+          )}
+        </div>
+
+        {/* Contador de caracteres - solo si es necesario */}
+        {showCharacterCount && value.length > 0 && (
+          <div className={`character-counter-enhanced ${isNearLimit ? 'near-limit' : ''} ${isOverLimit ? 'over-limit' : ''}`}>
+            {value.length}/{maxLength}
           </div>
         )}
 
@@ -517,8 +551,8 @@ const TodoInput = forwardRef(({
           </div>
         )}
 
-        {/* Barra de progreso de caracteres */}
-        {value.length > 0 && (
+        {/* Barra de progreso de caracteres - solo si está escribiendo */}
+        {value.length > 50 && (
           <div className="character-progress-enhanced">
             <div 
               className="progress-bar-enhanced"
